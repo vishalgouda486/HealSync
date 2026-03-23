@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>HealSync AI | Login Portal</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        body { margin: 0; height: 100vh; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }
+        #threeCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        
+        /* UI Shifted: Box moved more to the left */
+        .login-card {
+            position: absolute; 
+            right: 22%; /* Adjust this to move the box left/right as needed */
+            top: 50%; 
+            transform: translateY(-50%);
+            
+            /* CHANGE THESE VALUES */
+            width: 500px;      /* Increased width */
+            padding: 60px;     /* Increased internal spacing */
+            
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(25px); 
+            border-radius: 20px; /* Slightly more rounded for a larger box */
+            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15); 
+            z-index: 10;
+        }
+        input { 
+            width: 100%; 
+            padding: 17px !important;       /* Taller inputs */
+            font-size: 1rem !important;   /* Larger typing text */
+            margin-bottom: 20px !important; 
+            border-radius: 18px; 
+            border: 2px solid #e2e8f0; 
+            outline: none; 
+        }
+        input:focus { border-color: #2563eb; box-shadow: 0 0 15px rgba(37, 99, 235, 0.1); }
+        button { 
+            width: 50% !important; 
+            display: block !important;      /* This allows the margin trick to work */
+            margin: 0 auto !important;      /* Center the button horizontally */
+            padding: 15px !important;       /* Larger button */
+            font-size: 1.2rem;   /* Bigger "Login" text */
+            border-radius: 18px; 
+            background: #2563eb; 
+            color: white; 
+            font-weight: 800; 
+        }
+        button:hover { background: #1d4ed8; transform: translateY(-2px); }
+    
+    </style>
+</head>
+<body>
+
+<canvas id="threeCanvas"></canvas>
+
+<div class="login-card">
+    <h2 class="text-2xl font-black mb-6">HealSync <span class="text-blue-600">AI</span></h2>
+    <input type="text" id="email" placeholder="Email" onfocus="window.playAnim('username')" onblur="window.playAnim('idle')">
+    <input type="password" id="password" placeholder="Password" onfocus="window.playAnim('coverEyes')" onblur="window.playAnim('idle')">
+    <button onclick="handleLogin()">Login</button>
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+
+let scene, camera, renderer, mixer, model, currentAction;
+let ecgLine;
+const animations = {};
+const clock = new THREE.Clock();
+
+function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf1f5f9); 
+
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.set(0, 1.8, 5); 
+
+    // Quality Improvements: Antialias enabled and PixelRatio set
+    renderer = new THREE.WebGLRenderer({ 
+        canvas: document.getElementById('threeCanvas'), 
+        antialias: true,
+        powerPreference: "high-performance"
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio); // Fixes blurriness on 4K/Retina
+    renderer.outputColorSpace = THREE.SRGBColorSpace; // Better color rendering
+
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 3);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+    dirLight.position.set(0, 5, 5);
+    scene.add(dirLight);
+
+    ecgLine = createECGLine();
+    scene.add(ecgLine);
+
+    loadModels();
+    animate();
+}
+
+function loadModels() {
+    const loader = new FBXLoader();
+    
+    loader.load('./models/Doctor.fbx', (fbx) => {
+        model = fbx;
+        model.scale.set(1.2, 1.2, 1.2); 
+        
+        // Position Adjusted: Moved more to the right side (0.5 instead of -0.5)
+        model.position.set(-0.89, 0.75, -0.2); 
+        model.rotation.y = 0.2; 
+        
+        scene.add(model);
+
+        mixer = new THREE.AnimationMixer(model);
+        
+        if(fbx.animations.length > 0) {
+            animations['idle'] = mixer.clipAction(fbx.animations[0]);
+            animations['idle'].play();
+            currentAction = animations['idle'];
+        }
+
+        const extraAnims = [
+            { name: 'username', path: './models/Username.fbx' },
+            { name: 'coverEyes', path: './models/CoverEyes.fbx' },
+            { name: 'deny', path: './models/Deny.fbx' },
+            { name: 'celebrate', path: './models/Celebrate.fbx' }
+        ];
+
+        extraAnims.forEach(a => {
+            loader.load(a.path, (animFile) => {
+                animations[a.name] = mixer.clipAction(animFile.animations[0]);
+            });
+        });
+    });
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    if (mixer) mixer.update(delta);
+
+    // Moves the ECG line slightly to create a "scrolling" or "pulsing" effect
+    if (ecgLine) {
+        ecgLine.position.x += 0.01;
+        if (ecgLine.position.x > 5) ecgLine.position.x = -5; // Reset loop
+    }
+
+    renderer.render(scene, camera);
+}
+
+window.playAnim = function(name) {
+    if (!animations[name] || currentAction === animations[name]) return;
+    
+    const nextAction = animations[name];
+    nextAction.reset();
+    
+    if (name === 'coverEyes') {
+        nextAction.setLoop(THREE.LoopOnce); 
+        nextAction.clampWhenFinished = true; // Stay in the "Covered" pose
+    } else {
+        nextAction.setLoop(THREE.LoopRepeat);
+    }
+    
+    nextAction.fadeIn(0.5).play();
+    currentAction.fadeOut(0.5);
+    currentAction = nextAction;
+};
+
+// Fixed HandleLogin Function
+window.handleLogin = async function() {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+
+    try {
+        const res = await fetch("http://localhost:3000/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+        });
+
+        if (res.ok) {
+            window.playAnim('celebrate');
+            const data = await res.json();
+            sessionStorage.setItem("token", data.token);
+            sessionStorage.setItem("user", JSON.stringify(data.user));
+            setTimeout(() => {
+                window.location.href = data.user.role === "doctor" ? "doctor-dashboard.html" : "patient-dashboard.html";
+            }, 2000);
+        } else {
+            window.playAnim('deny');
+        }
+    } catch (e) {
+        window.playAnim('deny');
+    }
+};
+
+function createECGLine() {
+    const material = new THREE.LineBasicMaterial({ 
+        color: 0x1e3a8a, // Matching your blue theme
+        transparent: true,
+        opacity: 0.5
+    });
+
+    const points = [];
+    // Creating a standard ECG pattern
+    for (let i = 0; i < 100; i++) {
+        let x = (i - 50) * 0.2;
+        let y = 0;
+        
+        // The "Heartbeat" Spike logic
+        if (i % 20 === 0) y = 0;      // Baseline
+        else if (i % 20 === 5) y = 0.2;  // P wave
+        else if (i % 20 === 8) y = -0.2; // Q wave
+        else if (i % 20 === 10) y = 1.5; // R spike (The big one)
+        else if (i % 20 === 12) y = -0.4; // S wave
+        else if (i % 20 === 15) y = 0.3;  // T wave
+
+        points.push(new THREE.Vector3(x, y+1, -2)); // Placed behind the doctor
+    }
+
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const line = new THREE.Line(geometry, material);
+    return line;
+}
+
+init();
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live Queue</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+<style>
+.queue-container{
+    max-width:900px;
+    margin:40px auto;
+    font-family: 'Poppins', sans-serif;
+}
+
+.queue-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+}
+
+.my-card{
+    background:linear-gradient(135deg,#2563eb,#1e40af);
+    color:white;
+    padding:25px;
+    border-radius:16px;
+    margin-bottom:30px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.15);
+}
+
+.queue-section h3{
+    margin-bottom:15px;
+}
+
+.queue-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+    gap:15px;
+}
+
+.queue-card{
+    background:white;
+    padding:15px;
+    border-radius:12px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.08);
+    border-left:6px solid #2563eb;
+}
+
+.status-badge{
+    padding:4px 10px;
+    border-radius:20px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.waiting{ background:#facc15; color:#111; }
+.in_consultation{ background:#3b82f6; color:white; }
+.checked_in{ background:#10b981; color:white; }
+
+</style>
+
+
+</head>
+<body>
+
+    <div class="queue-container">
+
+        <div class="queue-header">
+            <h2>Live Queue</h2>
+            <button onclick="goBack()" class="secondary-btn">Back</button>
+        </div>
+
+        <div class="my-card" id="myToken"></div>
+
+        <div class="queue-section">
+            <h3>Current Queue</h3>
+            <div id="queueList" class="queue-grid"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const socket = io("http://localhost:3000");
+
+        const user = JSON.parse(sessionStorage.getItem("user"));
+        const doctorId = sessionStorage.getItem("selectedDoctor");
+
+
+
+
+        if (!user || !doctorId) {
+            window.location.href = "patient-dashboard.html";
+        }
+
+
+       function updateQueueUI(queue){
+
+            const list = document.getElementById("queueList");
+            list.innerHTML = "";
+
+            queue.forEach(patient => {
+
+                const card = document.createElement("div");
+                card.className = "queue-card";
+
+                card.innerHTML = `
+                    <div style="font-weight:700;">Token ${patient.token_number}</div>
+                    <div style="margin-top:6px;">${patient.name}</div>
+                    <div style="margin-top:6px; font-size:14px;">
+                        Expected: ${patient.expected_time}
+                    </div>
+                    <div style="margin-top:8px;">
+                        <span class="status-badge ${patient.status}">
+                            ${patient.status.replace('_',' ').toUpperCase()}
+                        </span>
+                    </div>
+                `;
+
+                list.appendChild(card);
+            });
+        }
+
+        function renderMyToken(myAppointment){
+
+            const myTokenDiv = document.getElementById("myToken");
+
+            myTokenDiv.innerHTML = `
+                <h3 style="margin:0;">Your Token</h3>
+
+                <div style="font-size:36px; font-weight:700; margin-top:10px;">
+                    ${myAppointment.token_number}
+                </div>
+
+                <div style="margin-top:15px; font-size:18px;">
+                    You are <strong>#${myAppointment.queue_position}</strong> in queue
+                </div>
+
+                <div style="margin-top:10px;">
+                    Expected Time: ${myAppointment.expected_time}
+                </div>
+
+                <div style="margin-top:10px;">
+                    Status: ${myAppointment.status.toUpperCase()}
+                </div>
+            `;
+
+            // ✅ Show Cancel button if waiting or checked_in
+            if (myAppointment.status === "waiting" || myAppointment.status === "checked_in") {
+
+                myTokenDiv.innerHTML += `
+                    <button onclick="cancelMyAppointment(${myAppointment.id})"
+                        style="margin-top:15px; padding:8px 16px; background:#dc2626; color:white; border:none; border-radius:8px; cursor:pointer;">
+                        Cancel Appointment
+                    </button>
+                `;
+            }
+
+            // ✅ Show Check-In button if waiting or absent
+            if (myAppointment.status === "waiting" || myAppointment.status === "absent") {
+
+                myTokenDiv.innerHTML += `
+                    <button onclick="checkIn(${myAppointment.id})"
+                        style="margin-top:10px; padding:8px 16px; background:#2563eb; color:white; border:none; border-radius:8px; cursor:pointer;">
+                        Check-In at Clinic
+                    </button>
+                `;
+            }
+        }
+
+        
+        function checkIn(appointmentId) {
+
+            if (!navigator.geolocation) {
+                alert("Geolocation not supported");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(async function(position) {
+
+                const patientLat = position.coords.latitude;
+                const patientLng = position.coords.longitude;
+
+                const res = await fetch("http://localhost:3000/doctors");
+                const doctors = await res.json();
+
+                const doctor = doctors.find(d => d.id == doctorId);
+
+                if (!doctor) {
+                    alert("Doctor not found");
+                    return;
+                }
+
+                const clinicLat = doctor.clinic_lat;
+                const clinicLng = doctor.clinic_lng;
+
+                const distance = getDistance(patientLat, patientLng, clinicLat, clinicLng);
+
+                if (distance <= 0.2) {
+
+                    socket.emit("checkIn", { appointmentId });
+
+                    alert("Check-In Successful!");
+
+                } else {
+                    alert("You are not near the clinic (within 200m required)");
+                }
+
+            });
+        }
+
+        function cancelMyAppointment(appointmentId){
+
+            if(!confirm("Are you sure you want to cancel?")) return;
+
+            socket.emit("cancelAppointment", {
+                appointmentId,
+                doctorId
+            });
+
+            alert("Appointment cancelled");
+
+            window.location.href = "patient-dashboard.html";
+        }
+
+        // Haversine formula
+        function getDistance(lat1, lon1, lat2, lon2) {
+
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+
+            const a =
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) *
+                Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c;
+        }
+
+        socket.on("connect", () => {
+            console.log("Connected to server");
+
+            const today = new Date().toISOString().slice(0,10);
+
+            socket.emit("requestQueue", {
+                doctorId,
+                date: today
+            });
+        });
+
+        socket.on("queueUpdated", (data) => {
+
+            if(data.doctorId == doctorId){
+
+                updateQueueUI(data.queue);
+
+                // 🔥 Find my token from updated queue
+                const myToken = data.queue.find(p => p.patient_id == user.id);
+
+                if (myToken) {
+                    renderMyToken(myToken);
+                } else {
+                    document.getElementById("myToken").innerHTML = "No active appointment.";
+                }
+
+            }
+
+        });
+
+    </script>
+
+</body>
+</html>

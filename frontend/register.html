@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>HealSync AI | Registration</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        body { margin: 0; height: 100vh; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }
+        #threeCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        
+        /* UI Matched to Login Page */
+        .register-card {
+            position: absolute; 
+            right: 22%; 
+            top: 50%; 
+            transform: translateY(-50%);
+            width: 500px; 
+            padding: 50px; 
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(25px); 
+            border-radius: 20px; 
+            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15); 
+            z-index: 10;
+        }
+
+        .input-vps {
+            width: 100%; 
+            padding: 15px !important;
+            font-size: 0.95rem !important;
+            margin-bottom: 15px !important; 
+            border-radius: 15px; 
+            border: 2px solid #e2e8f0; 
+            outline: none; 
+            transition: 0.3s;
+        }
+
+        .input-vps:focus { border-color: #2563eb; box-shadow: 0 0 15px rgba(37, 99, 235, 0.1); }
+
+        .deploy-btn {
+            width: 60% !important; 
+            display: block !important;
+            margin: 20px auto 0 auto !important;
+            padding: 15px !important;
+            font-size: 1.1rem;
+            border-radius: 18px; 
+            background: #2563eb; 
+            color: white; 
+            font-weight: 800; 
+            transition: 0.3s;
+            cursor: pointer;
+        }
+
+        .deploy-btn:hover { background: #1d4ed8; transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+
+<canvas id="threeCanvas"></canvas>
+
+<div class="register-card" id="regCard">
+    <div class="mb-6">
+        <h2 class="text-3xl font-black tracking-tighter uppercase">Create_<span class="text-blue-600">Account</span></h2>
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Fill in your details</p>
+    </div>
+
+    <div class="space-y-1">
+        <input type="text" id="name" class="input-vps" placeholder="NAME" onfocus="window.playAnim('username')" onblur="window.playAnim('idle')">
+        <input type="email" id="email" class="input-vps" placeholder="MAIL ID" onfocus="window.playAnim('username')" onblur="window.playAnim('idle')">
+        <input type="password" id="password" class="input-vps" placeholder="PASSWORD" onfocus="window.playAnim('coverEyes')" onblur="window.playAnim('idle')">
+        
+        <select id="role" onchange="handleRoleShift()" class="input-vps cursor-pointer">
+            <option value="patient">I AM: USER</option>
+            <option value="doctor">I AM: DOCTOR</option>
+        </select>
+
+        <div id="practitionerFields" style="display:none;" class="space-y-1 pt-2">
+            <input type="text" id="specialization" class="input-vps" placeholder="SPECIALIZATION">
+            <input type="number" id="fee" class="input-vps" placeholder="Consultation Fee">
+            <div class="flex gap-2">
+                <input type="text" id="lat" class="input-vps" placeholder="Latitude">
+                <input type="text" id="lng" class="input-vps" placeholder="Longitude">
+            </div>
+        </div>
+    </div>
+
+    <button onclick="executeDeployment()" class="deploy-btn">Register</button>
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+
+let scene, camera, renderer, mixer, model, currentAction, ecgLine;
+const animations = {};
+const clock = new THREE.Clock();
+
+function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf1f5f9); 
+
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.set(0, 1.8, 5); 
+
+    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('threeCanvas'), antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 2.5));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+    dirLight.position.set(0, 5, 5);
+    scene.add(dirLight);
+
+    ecgLine = createECGLine();
+    scene.add(ecgLine);
+
+    loadModels();
+    animate();
+}
+
+function loadModels() {
+    const loader = new FBXLoader();
+    
+    loader.load('./models/Doctor.fbx', (fbx) => {
+        model = fbx;
+        model.scale.set(1.2, 1.2, 1.2); 
+        model.position.set(-0.89, 0.75, -0.2); 
+        model.rotation.y = 0.2; 
+        scene.add(model);
+
+        mixer = new THREE.AnimationMixer(model);
+
+        // Load the Base Idle first
+        if(fbx.animations.length > 0) {
+            animations['idle'] = mixer.clipAction(fbx.animations[0]);
+            animations['idle'].play();
+            currentAction = animations['idle'];
+        }
+
+        // Greeting plays immediately on load
+        loader.load('./models/Greeting.fbx', (anim) => {
+            const action = mixer.clipAction(anim.animations[0]);
+            action.setLoop(THREE.LoopOnce);
+            action.play();
+            currentAction = action;
+        });
+
+        const extraAnims = [
+            { name: 'username', path: './models/Username.fbx' },
+            { name: 'coverEyes', path: './models/CoverEyes.fbx' },
+            { name: 'salute', path: './models/Salute.fbx' },
+            { name: 'celebrate', path: './models/Celebrate.fbx' }
+        ];
+
+        extraAnims.forEach(a => {
+            loader.load(a.path, (animFile) => {
+                animations[a.name] = mixer.clipAction(animFile.animations[0]);
+            });
+        });
+    });
+}
+
+window.playAnim = function(name) {
+    if (!animations[name] || currentAction === animations[name]) return;
+    const next = animations[name];
+    next.reset();
+    
+    if (name === 'coverEyes') {
+        next.setLoop(THREE.LoopOnce); 
+        next.clampWhenFinished = true; 
+    } else {
+        next.setLoop(THREE.LoopRepeat);
+    }
+    
+    next.fadeIn(0.5).play();
+    currentAction.fadeOut(0.5);
+    currentAction = next;
+};
+
+window.handleRoleShift = function() {
+    const role = document.getElementById("role").value;
+    const fields = document.getElementById("practitionerFields");
+    if (role === "doctor") {
+        fields.style.display = "block";
+        window.playAnim('salute'); // Salute for Doctors
+    } else {
+        fields.style.display = "none";
+        window.playAnim('idle');
+    }
+};
+
+window.executeDeployment = async function() {
+
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const role = document.getElementById("role").value;
+
+    const specialization = document.getElementById("specialization")?.value.trim();
+    const fee = document.getElementById("fee")?.value.trim();
+    const lat = document.getElementById("lat")?.value.trim();
+    const lng = document.getElementById("lng")?.value.trim();
+
+    if (!name || !email || !password) {
+        alert("All fields are required");
+        return;
+    }
+
+    if (role === "doctor") {
+        if (!specialization || !fee || !lat || !lng) {
+            alert("Please fill all doctor details");
+            return;
+        }
+    }
+
+    try {
+        const res = await fetch("http://localhost:3000/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name,
+                email,
+                password,
+                role,
+                age: null,
+                gender: null,
+                specialization,
+                fee,
+                lat,
+                lng
+            })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            alert(data.message || "Registration failed");
+            return;
+        }
+
+        window.playAnim('celebrate');
+
+        setTimeout(() => {
+            window.location.href = "login.html";
+        }, 2000);
+
+    } catch (error) {
+        alert("Server error. Please try again.");
+    }
+};
+
+function createECGLine() {
+    const material = new THREE.LineBasicMaterial({ color: 0x1e3a8a, transparent: true, opacity: 0.5 });
+    const points = [];
+    for (let i = 0; i < 100; i++) {
+        let x = (i - 50) * 0.2;
+        let y = 0;
+        if (i % 20 === 5) y = 0.2;
+        else if (i % 20 === 10) y = 1.5;
+        else if (i % 20 === 15) y = 0.3;
+        points.push(new THREE.Vector3(x, y + 1, -2));
+    }
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    return new THREE.Line(geometry, material);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    if (mixer) mixer.update(delta);
+    if (ecgLine) {
+        ecgLine.position.x += 0.01;
+        if (ecgLine.position.x > 5) ecgLine.position.x = -5;
+    }
+    renderer.render(scene, camera);
+}
+
+init();
+</script>
+
+<script>
+async function handleLogin() {
+
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    if (!email || !password) {
+        alert("Please enter email and password");
+        return;
+    }
+
+    try {
+        const res = await fetch("http://localhost:3000/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            alert(data.message);
+            return;
+        }
+
+        // Save token & user
+        sessionStorage.setItem("token", data.token);
+        sessionStorage.setItem("user", JSON.stringify(data.user));
+
+        // Redirect based on role
+        if (data.user.role === "doctor") {
+            window.location.href = "doctor-dashboard.html";
+        } else {
+            window.location.href = "patient-dashboard.html";
+        }
+
+    } catch (error) {
+        console.error(error);
+        alert("Server error");
+    }
+}
+</script>
+
+</body>
+</html>

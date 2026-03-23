@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Doctor Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+
+<header class="header">
+    <div class="brand">
+        <div class="logo">DR</div>
+        <div>
+            <div class="title">Doctor Dashboard</div>
+            <div class="subtitle">Manage live appointments</div>
+        </div>
+        <div style="margin-left:20px; font-weight:600;">
+            👨‍⚕️ Dr. <span id="doctorName"></span>
+        </div>
+    </div>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+</header>
+
+<main class="container">
+    <!-- DOCTOR SUMMARY CARDS -->
+    <div style="display:flex; gap:20px; margin-bottom:30px; flex-wrap:wrap;">
+
+    <div class="card" style="flex:1; min-width:180px; padding:20px;">
+        <h3>👥 Patients Today</h3>
+        <div id="totalToday" style="font-size:22px; font-weight:bold;">0</div>
+    </div>
+
+    <div class="card" style="flex:1; min-width:180px; padding:20px;">
+        <h3>⏳ Waiting</h3>
+        <div id="waitingCount" style="font-size:22px; font-weight:bold;">0</div>
+    </div>
+
+    <div class="card" style="flex:1; min-width:180px; padding:20px;">
+        <h3>✅ Completed</h3>
+        <div id="completedToday" style="font-size:22px; font-weight:bold;">0</div>
+    </div>
+
+    <div class="card" style="flex:1; min-width:180px; padding:20px;">
+        <h3>💰 Revenue Today</h3>
+        <div id="revenueToday" style="font-size:22px; font-weight:bold;">₹0</div>
+    </div>
+    </div>
+
+    <!-- SLOT MANAGEMENT -->
+    <div class="card" style="padding:20px; margin-bottom:30px;">
+        <h2>🕒 Slot Management</h2>
+
+        <!-- Working Hours -->
+        <div style="margin-top:15px;">
+            <h4>Set Working Hours</h4>
+            Start:
+            <input type="time" id="startTime">
+            End:
+            <input type="time" id="endTime">
+            <button class="primary-btn" onclick="setWorkingHours()">Save</button>
+        </div>
+
+        <hr style="margin:20px 0;">
+
+        <!-- Close Clinic -->
+        <div>
+            <h4>Close Clinic For Today</h4>
+            <button class="secondary-btn" onclick="closeClinic()">Close Today</button>
+        </div>
+
+        <hr style="margin:20px 0;">
+
+        <!-- Block Specific Slot -->
+        <div>
+            <h4>Block Specific Date & Time</h4>
+            <input type="datetime-local" id="blockDateTime">
+            <button class="secondary-btn" onclick="blockSlot()">Block</button>
+        </div>
+
+    </div>
+
+
+    <div class="h1">
+        Live Patient Queue
+        <input type="date" id="queueDate" style="margin-left:15px;">
+    </div>
+    <div id="queueList" class="card-grid"></div>
+
+    <!-- Patient Detail Side Panel -->
+    <div id="patientPanel"
+        style="position:fixed;
+                top:0;
+                right:-500px;
+                width:450px;
+                height:100%;
+                background:white;
+                box-shadow:-3px 0 10px rgba(0,0,0,0.1);
+                padding:20px;
+                overflow:auto;
+                transition:0.3s;
+                z-index:9999;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Patient Details</h2>
+            <button onclick="closePatientPanel()">✖</button>
+        </div>
+
+        <div id="patientInfo" style="margin-top:15px;"></div>
+
+    </div>
+
+</main>
+
+<!-- Prescription Modal -->
+<div id="prescriptionModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); justify-content:center; align-items:center;">
+    <div style="background:white; padding:25px; border-radius:12px; width:600px; max-height:90vh; overflow:auto;">
+
+        <h2>Create Prescription</h2>
+        <p><strong>Patient:</strong> <span id="patientName"></span></p>
+        <p><strong>Date:</strong> <span id="prescriptionDate"></span></p>
+
+        <div id="medicineContainer"></div>
+
+        <button class="secondary-btn" onclick="addMedicine()">+ Add Medicine</button>
+        <br><br>
+
+        <button class="primary-btn" onclick="submitPrescription()">Submit Prescription</button>
+        <button class="secondary-btn" onclick="closeModal()">Cancel</button>
+
+    </div>
+</div>
+
+<script>
+
+const socket = io("http://localhost:3000");
+const user = JSON.parse(sessionStorage.getItem("user"));
+document.getElementById("doctorName").innerText = user.name;
+
+if (!user || user.role !== "doctor") {
+    window.location.href = "login.html";
+}
+
+let doctorId = null;
+let currentAppointmentId = null;
+let currentPatientId = null;
+
+const token = sessionStorage.getItem("token");
+
+async function loadDoctorSummary(){
+
+  const res = await fetch("http://localhost:3000/doctor-summary/" + doctorId, {
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  });
+
+  const data = await res.json();
+
+  document.getElementById("totalToday").innerText = data.totalToday || 0;
+  document.getElementById("waitingCount").innerText = data.waiting || 0;
+  document.getElementById("completedToday").innerText = data.completed || 0;
+  document.getElementById("revenueToday").innerText = "₹" + (data.revenueToday || 0);
+  }
+
+async function getDoctorId() {
+    const res = await fetch("http://localhost:3000/doctor-profile/" + user.id);
+    const data = await res.json();
+    doctorId = data.doctorId;
+
+    document.getElementById("queueDate").value =
+        new Date().toISOString().slice(0,10);
+
+    console.log("Doctor ID:", doctorId);
+
+    loadInitialQueue();
+    loadDoctorSummary();   // ← ADD THIS LINE
+}
+
+async function loadInitialQueue() {
+
+    const selectedDate =
+        document.getElementById("queueDate").value ||
+        new Date().toISOString().slice(0,10);
+
+    const res = await fetch(
+        "http://localhost:3000/doctor-live-queue/" + doctorId + "?date=" + selectedDate
+    );
+
+    const queue = await res.json();
+    updateUI(queue);
+}
+
+function updateUI(queue) {
+    const container = document.getElementById("queueList");
+    container.innerHTML = "";
+
+    queue.forEach(patient => {
+
+        const card = document.createElement("div");
+        card.className = "card";
+
+       card.innerHTML = `
+        <h3>Token ${patient.token_number}</h3>
+
+        <p>
+            <strong>Patient:</strong> 
+            <span style="cursor:pointer; color:#2563eb;"
+                    onclick="openPatientPanel(${patient.patient_id})">
+                    ${patient.name}
+            </span>
+            </p>
+
+        <p><strong>Booked At:</strong> 
+            ${new Date(patient.created_at).toLocaleTimeString()}
+        </p>
+
+        <p><strong>Expected:</strong> ${patient.expected_time}</p>
+
+        <p><strong>Status:</strong> 
+            <span style="color:
+                ${patient.status === 'waiting' ? 'orange' :
+                patient.status === 'in_consultation' ? 'blue' :
+                'green'}">
+                ${patient.status.replace('_',' ').toUpperCase()}
+            </span>
+        </p>
+
+        ${(patient.status === 'waiting' || patient.status === 'checked_in') ? `
+        <button 
+            onclick="startConsultation(${patient.id})"
+            style="
+                padding:8px 14px;
+                border:none;
+                border-radius:8px;
+                cursor:pointer;
+                font-weight:600;
+                background:${patient.status === 'checked_in' ? '#16a34a' : '#f59e0b'};
+                color:white;
+            ">
+            ${patient.status === 'checked_in' ? 'Start Consultation (Patient Present)' : 'Start Consultation'}
+        </button>
+    ` : ""}
+
+        ${patient.status === 'in_consultation' ? `
+            <button class="primary-btn"
+                onclick="openPrescription(${patient.id}, '${patient.name}', ${patient.patient_id})">
+                Mark Completed & Prescribe
+            </button>
+        ` : ""}
+    `;
+
+        container.appendChild(card);
+    });
+}
+
+socket.on("queueUpdated", (data) => {
+
+    if(data.doctorId == doctorId){
+
+        updateUI(data.queue);
+        loadDoctorSummary();
+
+    }
+
+});
+
+/* ===== Prescription Modal Logic ===== */
+
+function openPrescription(appointmentId, patientName, patientId) {
+    currentAppointmentId = appointmentId;
+    currentPatientId = patientId;
+    document.getElementById("patientName").innerText = patientName;
+    document.getElementById("prescriptionDate").innerText = new Date().toLocaleDateString();
+    document.getElementById("medicineContainer").innerHTML = "";
+    addMedicine();
+    document.getElementById("prescriptionModal").style.display = "flex";
+}
+
+function closeModal() {
+    document.getElementById("prescriptionModal").style.display = "none";
+}
+
+function startConsultation(appointmentId){
+    socket.emit("startConsultation", {
+        appointmentId,
+        doctorId
+    });
+}
+
+function addMedicine() {
+
+    const container = document.getElementById("medicineContainer");
+
+    const div = document.createElement("div");
+    div.style.border = "1px solid #ddd";
+    div.style.padding = "10px";
+    div.style.marginBottom = "10px";
+    div.style.borderRadius = "8px";
+
+    div.innerHTML = `
+        <input placeholder="Medicine Name" class="med-name"><br><br>
+        Morning: <input type="text" class="med-morning" placeholder="1 / 0 / ½">
+        Afternoon: <input type="text" class="med-afternoon" placeholder="1 / 0 / ½">
+        Night: <input type="text" class="med-night" placeholder="1 / 0 / ½"><br><br>
+        Duration (days): <input type="number" class="med-days">
+    `;
+
+    container.appendChild(div);
+}
+
+function submitPrescription() {
+
+    const medicines = [];
+
+    document.querySelectorAll("#medicineContainer > div").forEach(div => {
+
+        medicines.push({
+            name: div.querySelector(".med-name").value,
+            morning: div.querySelector(".med-morning").value,
+            afternoon: div.querySelector(".med-afternoon").value,
+            night: div.querySelector(".med-night").value,
+            days: div.querySelector(".med-days").value
+        });
+    });
+
+    socket.emit("completeToken", {
+        appointmentId: currentAppointmentId,
+        doctorId,
+        medicines,
+        patientId: currentPatientId
+    });
+
+    closeModal();
+}
+
+function logout() {
+    sessionStorage.removeItem("user");
+    window.location.href = "login.html";
+}
+
+getDoctorId();
+
+async function openPatientPanel(patientId){
+
+    const res = await fetch(
+        "http://localhost:3000/patient-details/" + patientId,
+        {
+            headers: {
+                Authorization: "Bearer " + token
+            }
+        }
+    );
+
+    const data = await res.json();
+
+    const container = document.getElementById("patientInfo");
+
+    container.innerHTML = "";
+
+    // BASIC INFO
+    container.innerHTML += `
+        <h3>${data.patient.name}</h3>
+        <p><strong>Age:</strong> ${data.patient.age || 'N/A'}</p>
+        <p><strong>Gender:</strong> ${data.patient.gender || 'N/A'}</p>
+        <hr>
+    `;
+
+    // ACTIVE MEDICINES
+    container.innerHTML += `<h4>Active Medicines</h4>`;
+
+    if(data.activeMedicines.length === 0){
+        container.innerHTML += `<p>No active medicines</p>`;
+    } else {
+        data.activeMedicines.forEach(med => {
+            container.innerHTML += `
+                <div style="margin-bottom:10px; padding:8px; background:#f3f4f6; border-radius:8px;">
+                    <strong>${med.medicine_name}</strong><br>
+                    Morning: ${med.morning || '-'} |
+                    Afternoon: ${med.afternoon || '-'} |
+                    Night: ${med.night || '-'}<br>
+                    Ends: ${new Date(med.end_date).toLocaleDateString()}
+                </div>
+            `;
+        });
+    }
+
+    container.innerHTML += `<hr><h4>Past Prescriptions</h4>`;
+
+    if(data.prescriptions.length === 0){
+        container.innerHTML += `<p>No past prescriptions</p>`;
+    } else {
+        data.prescriptions.forEach((p, index) => {
+
+    let medsHTML = "";
+
+    if (p.medicines.length === 0) {
+        medsHTML = "<p>No medicines listed</p>";
+    } else {
+        p.medicines.forEach(med => {
+            medsHTML += `
+                <div style="margin-top:6px; padding:6px; background:#f9fafb; border-radius:6px;">
+                    <strong>${med.medicine_name}</strong><br>
+                    Morning: ${med.morning || '-'} |
+                    Afternoon: ${med.afternoon || '-'} |
+                    Night: ${med.night || '-'}<br>
+                    Duration: ${med.duration_days} days
+                </div>
+            `;
+        });
+    }
+
+    container.innerHTML += `
+        <div style="margin-bottom:15px; border:1px solid #ddd; border-radius:8px; overflow:hidden;">
+
+            <div onclick="togglePrescription(${index})"
+                 style="cursor:pointer; padding:10px; background:#f3f4f6; display:flex; justify-content:space-between;">
+                 
+                <div>
+                    <strong>Dr. ${p.doctor_name}</strong><br>
+                    <small>Date: ${new Date(p.created_at).toLocaleDateString()}</small>
+                </div>
+
+                <div id="arrow_${index}">▼</div>
+            </div>
+
+            <div id="prescription_${index}" 
+                 style="display:none; padding:10px;">
+                 ${medsHTML}
+            </div>
+
+        </div>
+    `;
+});
+    }
+
+    // Slide in panel
+    document.getElementById("patientPanel").style.right = "0px";
+}
+
+function togglePrescription(index){
+
+    const body = document.getElementById("prescription_" + index);
+    const arrow = document.getElementById("arrow_" + index);
+
+    if(body.style.display === "none"){
+        body.style.display = "block";
+        arrow.innerText = "▲";
+    } else {
+        body.style.display = "none";
+        arrow.innerText = "▼";
+    }
+}
+
+function closePatientPanel(){
+    document.getElementById("patientPanel").style.right = "-500px";
+}
+
+/* ---------------- SLOT MANAGEMENT ---------------- */
+
+async function setWorkingHours(){
+
+    const start_time = document.getElementById("startTime").value;
+    const end_time = document.getElementById("endTime").value;
+
+    if(!start_time || !end_time){
+        alert("Please select both times");
+        return;
+    }
+
+    const res = await fetch("http://localhost:3000/set-working-hours", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token
+        },
+        body: JSON.stringify({
+            doctor_id: doctorId,
+            start_time,
+            end_time
+        })
+    });
+
+    const data = await res.json();
+    alert(data.message);
+}
+
+async function closeClinic(){
+
+    const res = await fetch("http://localhost:3000/close-clinic", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token
+        },
+        body: JSON.stringify({
+            doctor_id: doctorId
+        })
+    });
+
+    const data = await res.json();
+    alert(data.message);
+}
+
+async function blockSlot(){
+
+    const blocked_time = document.getElementById("blockDateTime").value;
+
+    if(!blocked_time){
+        alert("Select date & time first");
+        return;
+    }
+
+    const res = await fetch("http://localhost:3000/block-slot", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token
+        },
+        body: JSON.stringify({
+            doctor_id: doctorId,
+            blocked_time
+        })
+    });
+
+    const data = await res.json();
+    alert(data.message);
+}
+
+document.getElementById("queueDate")
+    .addEventListener("change", loadInitialQueue);
+
+</script>
+
+</body>
+</html>
