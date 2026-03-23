@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>HealSync • Patient</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+ <style>
+    :root {
+      --bg: #050810; /* Deep Obsidian */
+      --card-bg: rgba(255, 255, 255, 0.03); 
+      --text: #ffffff;
+      --accent: #00d4ff;
+      --glow: rgba(124, 58, 237, 0.3);
+      --border: rgba(255, 255, 255, 0.08);
+    }
+
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --card-bg: rgba(0, 0, 0, 0.03);
+      --text: #0f172a;
+      --accent: #2563eb;
+      --glow: rgba(37, 99, 235, 0.1);
+      --border: rgba(0, 0, 0, 0.1);
+    }
+
+    body {
+      background-color: var(--bg) !important;
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      transition: background 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow-x: hidden;
+      isolation: isolate;
+    }
+
+    /* The "Sexy" Glass Effect */
+    .glass {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      transition: all 0.4s cubic-bezier(0.2, 1, 0.2, 1);
+    }
+
+    .glass:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 30px var(--glow);
+      transform: translateY(-5px) scale(1.01);
+    }
+
+    .text-gradient {
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Background Grid & Spheres from Index */
+    .bg-grid {
+      position: fixed; inset: 0;
+      background-image: radial-gradient(var(--accent) 1px, transparent 1px);
+      background-size: 40px 40px; 
+      opacity: 0.05;
+      z-index: -1;
+    }
+
+    .parallax-sphere {
+      position: fixed;
+      border-radius: 50%;
+      transition: background 1.5s ease;
+      filter: blur(80px);
+      background: var(--glow);
+      z-index: -10;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    /* Custom Scrollbar for that 'Pro' feel */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
+
+    /* Animated Status Pills */
+    .status-pill {
+      padding: 4px 12px; border-radius: 99px; font-size: 10px; font-weight: 800; 
+      text-transform: uppercase; animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+  
+    /* Overriding old styles.css for the Doctor Cards */
+    .card {
+      background: var(--card-bg) !important;
+      backdrop-filter: blur(15px);
+      border: 1px solid var(--border) !important;
+      border-radius: 2rem !important;
+      padding: 2rem !important;
+      color: var(--text) !important;
+      box-shadow: none !important;
+    }
+
+    /* Sexy Doctor Card Interactions */
+    .card {
+      transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1) !important;
+    }
+
+    .card:hover {
+      transform: translateY(-10px) scale(1.02) !important;
+      border-color: var(--accent) !important;
+      background: rgba(255, 255, 255, 0.05) !important;
+      box-shadow: 0 20px 40px rgba(0, 212, 255, 0.1) !important;
+    }
+
+    /* Subtle glow for the avatar on hover */
+    .card:hover .doc-avatar {
+      box-shadow: 0 0 20px var(--accent);
+      transform: rotate(-5deg) scale(1.1);
+      transition: all 0.4s ease;
+    }
+
+    .doc-name { color: var(--text) !important; font-size: 1.25rem !important; font-weight: 900 !important; }
+    .doc-spec { color: var(--accent) !important; opacity: 0.8; font-weight: 700 !important; text-transform: uppercase; font-size: 0.7rem !important; }
+    .fee { background: var(--accent) !important; color: #000 !important; font-weight: 900 !important; border-radius: 0.75rem !important; }
+    
+    .doc-avatar {
+      background: linear-gradient(135deg, var(--accent), #7c3aed) !important;
+      color: white !important;
+      border-radius: 1rem !important;
+    }
+
+    /* Medical Cross Particles */
+    .particle {
+        position: fixed;
+        width: 20px; height: 20px;
+        background: var(--accent);
+        clip-path: polygon(33% 0%, 66% 0%, 66% 33%, 100% 33%, 100% 66%, 66% 66%, 66% 100%, 33% 100%, 33% 66%, 0% 66%, 0% 33%, 33% 33%);
+        opacity: 0.15;
+        pointer-events: none;
+        z-index: -1;
+    }
+
+    header .logo, #sideMenu .logo {
+    background: transparent !important;
+    box-shadow: none !important;
+    width: auto !important;
+    height: auto !important;
+    }
+
+    /* Glassy Date Input for Doctor Cards */
+    input[type="date"] {
+      background: rgba(255, 255, 255, 0.05) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 12px !important;
+      padding: 8px 12px !important;
+      color: var(--text) !important;
+      color-scheme: dark; /* This makes the calendar icon/picker dark */
+      font-weight: 600;
+      font-size: 0.75rem;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+    input[type="date"]:focus {
+      border-color: var(--accent) !important;
+      background: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* Fix prescription table text visibility */
+    .prescription-card table {
+      color: var(--text);
+    }
+
+    .prescription-card td {
+      padding: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .prescription-card th {
+      padding: 8px;
+      border: 1px solid var(--border);
+    }
+
+    /* ===== FORCE PRESCRIPTION TEXT VISIBILITY ===== */
+
+    [data-theme="dark"] .prescription-card,
+    body:not([data-theme="light"]) .prescription-card {
+      color: #ffffff !important;
+    }
+
+    body:not([data-theme="light"]) .prescription-card td,
+    body:not([data-theme="light"]) .prescription-card th {
+      color: #ffffff !important;
+    }
+
+    body:not([data-theme="light"]) .prescription-card table {
+      color: #ffffff !important;
+    }
+
+    /* ===== DARK MODE PRESCRIPTION CARD FIX ===== */
+
+    body:not([data-theme="light"]) .prescription-card {
+      background: rgba(255,255,255,0.03) !important;
+      border-left: 5px solid var(--accent) !important;
+      color: var(--text) !important;
+    }
+
+    body:not([data-theme="light"]) .prescription-card strong {
+      color: var(--text) !important;
+    }
+
+    body:not([data-theme="light"]) .prescription-card table {
+      background: transparent !important;
+      color: var(--text) !important;
+    }
+
+    body:not([data-theme="light"]) .prescription-card td,
+    body:not([data-theme="light"]) .prescription-card th {
+      color: var(--text) !important;
+      border-color: var(--border) !important;
+    }
+
+  </style>
+</head>
+
+
+<body class="overflow-x-hidden relative z-0">
+  <div class="bg-grid"></div>
+  <div class="parallax-sphere w-96 h-96 top-0 -left-20" id="sphere1"></div>
+  <div class="parallax-sphere w-[500px] h-[500px] bottom-0 -right-20" id="sphere2"></div>
+  <div id="particle-container"></div>
+
+  <header class="fixed top-0 left-0 w-full p-6 flex justify-between items-center z-[1000] backdrop-blur-xl border-b border-white/10">
+      <div class="flex items-center gap-6">
+          <button onclick="toggleMenu()" class="glass p-3 rounded-xl hover:scale-110 transition-transform text-gradient text-xl">☰</button>
+          <div class="logo text-3xl font-black tracking-tighter uppercase cursor-pointer ml-4" onclick="window.location.href='index.html'">
+              Heal<span class="text-gradient">Sync</span>
+          </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+          <div class="hidden lg:flex items-center gap-4 glass px-6 py-2 rounded-2xl border-white/10 mr-4">
+              <span class="opacity-40 text-[10px] font-black uppercase tracking-[0.2em]">Authorized /</span>
+              <span id="loggedName" class="font-black text-xs uppercase text-gradient"></span>
+          </div>
+          
+          <button onclick="toggleTheme()" class="glass p-3 rounded-xl hover:scale-110 transition-transform border-white/10">
+              <span class="theme-icon text-lg">🌙</span>
+          </button>
+
+          <button class="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-5 py-2.5 rounded-xl font-black text-[10px] transition-all border border-red-500/20 uppercase tracking-tighter" onclick="logout()">
+              Logout
+          </button>
+      </div>
+  </header>
+
+  <main class="container mx-auto px-6 pt-32 pb-12 relative z-10">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12" id="overview-grid">
+          <div class="glass p-8 rounded-[2.5rem]">
+              <div class="flex justify-between items-start mb-4">
+                  <span class="text-3xl">🩺</span>
+                  <span class="status-pill bg-cyan-500/20 text-cyan-400">Live Status</span>
+              </div>
+              <h4 class="opacity-50 text-xs font-bold uppercase mb-1">Active Appointments</h4>
+              <div id="activeAppointments" class="text-5xl font-black italic">0</div>
+          </div>
+          
+          <div class="glass p-8 rounded-[2.5rem]">
+              <div class="flex justify-between items-start mb-4">
+                  <span class="text-3xl">💊</span>
+                  <span class="status-pill bg-purple-500/20 text-purple-400">Medication</span>
+              </div>
+              <h4 class="opacity-50 text-xs font-bold uppercase mb-1">Active Reminders</h4>
+              <div id="activeReminders" class="text-5xl font-black italic">0</div>
+          </div>
+
+         <div class="glass p-8 rounded-[2.5rem]">
+              <div class="flex justify-between items-start mb-4">
+                  <span class="text-3xl">⏰</span>
+                  <span class="status-pill bg-emerald-500/20 text-emerald-400">Next Dose</span>
+              </div>
+              <h4 class="opacity-50 text-xs font-bold uppercase mb-1">Latest Reminder</h4>
+              <div id="latestReminder" class="text-xl font-bold truncate">None</div>
+          </div>
+      </div> <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          <section class="lg:col-span-8 space-y-8" id="dashboardSection">
+              <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+                  <div>
+                      <h2 class="text-4xl font-black tracking-tighter uppercase">Find <span class="text-gradient">Specialists</span></h2>
+                      <p class="opacity-50 text-xs font-bold uppercase tracking-widest">Medical Network</p>
+                  </div>
+                  <select id="genderFilter" onchange="loadDoctors()" class="glass px-6 py-3 rounded-xl text-xs font-bold uppercase outline-none cursor-pointer">
+                      <option value="all">All Doctors</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                  </select>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="doctorList">
+                  </div>
+              
+              <div class="mt-16">
+                <h2 class="text-3xl font-black tracking-tighter uppercase mb-6">Current <span class="text-gradient">Prescription</span></h2>
+                <div class="glass p-8 rounded-[2.5rem]" id="currentPrescription">
+                   <p class="opacity-50">No active prescription</p>
+                </div>
+              </div>
+
+              <div id="reminderSection" style="display:none;" class="mt-8">
+                  <div class="glass p-8 rounded-[2.5rem]">
+                      <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-black uppercase">💊 My Reminders</h2>
+                        <button class="bg-white text-black px-6 py-2 rounded-xl font-bold" onclick="openReminderModal()">+ Add Medicine</button>
+                      </div>
+                      <div id="reminderList"></div>
+                  </div>
+              </div>
+
+              <div id="pharmacySection" style="display:none;" class="mt-8">
+                  <div class="glass p-8 rounded-[2.5rem]">
+                      <h2 class="text-2xl font-black uppercase mb-6">🏥 Find Medicine</h2>
+                      <div class="flex gap-4 mb-6">
+                        <input id="searchMedicine" placeholder="Enter name..." class="flex-1 bg-white/5 border border-white/10 p-4 rounded-xl">
+                        <button class="bg-white text-black px-8 py-2 rounded-xl font-bold" onclick="findMedicine()">Search</button>
+                      </div>
+                      <div id="pharmacyResults"></div>
+                  </div>
+              </div>
+
+              <div id="prescriptionSection" style="display:none;" class="mt-8">
+                <h2 class="text-2xl font-black uppercase mb-6">📜 All Prescriptions</h2>
+                <div id="prescriptionList" class="space-y-4"></div>
+              </div>
+          </section>
+
+          <aside class="lg:col-span-4 space-y-8">
+              <div class="glass p-8 rounded-[2.5rem] sticky top-8">
+                  <h3 class="text-xl font-black mb-6 uppercase tracking-tighter flex items-center gap-3">
+                      <span class="relative flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+                      </span>
+                      Live Queue Preview
+                  </h3>
+                  <div id="queuePreview" class="space-y-4">
+                      <div class="opacity-30 text-xs uppercase font-bold text-center py-10">No active sessions</div>
+                  </div>
+              </div>
+          </aside>
+      </div>
+  </main>
+
+
+<div id="sideMenu" class="glass"
+  style="position:fixed;top:0;left:-350px;width:300px;height:100%;
+         color:white;padding:60px 30px;
+         transition:0.6s cubic-bezier(0.2, 1, 0.2, 1);z-index:9999;
+         border-radius: 0 50px 50px 0; border-left:none; box-shadow: none;">
+
+ <div class="logo text-2xl font-black tracking-tighter uppercase mb-12 ml-0 w-fit">
+    Heal<span class="text-gradient">Sync</span>
+</div>
+
+  <nav class="space-y-6">
+      <div class="group flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform" onclick="showSection('dashboard')">
+        <span class="p-3 bg-white/5 rounded-xl group-hover:bg-cyan-500/20 transition-colors">🏠</span>
+        <span class="font-bold uppercase tracking-widest text-xs">Dashboard</span>
+      </div>
+
+      <div class="group flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform" onclick="showSection('reminders')">
+        <span class="p-3 bg-white/5 rounded-xl group-hover:bg-purple-500/20 transition-colors">💊</span>
+        <span class="font-bold uppercase tracking-widest text-xs">Tablet Reminder</span>
+      </div>
+
+      <div class="group flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform" onclick="showSection('pharmacy')">
+        <span class="p-3 bg-white/5 rounded-xl group-hover:bg-emerald-500/20 transition-colors">🏥</span>
+        <span class="font-bold uppercase tracking-widest text-xs">Pharmacy</span>
+      </div>
+
+      <div class="group flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform" onclick="showSection('prescriptions')">
+        <span class="p-3 bg-white/5 rounded-xl group-hover:bg-amber-500/20 transition-colors">📜</span>
+        <span class="font-bold uppercase tracking-widest text-xs">Prescriptions</span>
+      </div>
+  </nav>
+</div>
+
+<script>
+
+  gsap.registerPlugin(ScrollTrigger);
+  ScrollTrigger.defaults({ markers: false });
+
+
+ // MEDICAL CROSS PARTICLES
+  const pContainer = document.getElementById('particle-container');
+  for (let i = 0; i < 20; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle'; // This class already has the clip-path in your CSS
+      p.style.left = `${Math.random() * 100}vw`;
+      p.style.top = `${Math.random() * 100}vh`;
+      p.style.transform = `rotate(${Math.random() * 360}deg) scale(${Math.random() * 0.5 + 0.2})`;
+      pContainer.appendChild(p);
+      
+      // Floating Animation
+      gsap.to(p, { 
+          x: "random(-150, 150)", 
+          y: "random(-150, 150)", 
+          rotation: "+=360",
+          duration: "random(15, 30)", 
+          repeat: -1, 
+          yoyo: true, 
+          ease: "sine.inOut" 
+      });
+  }
+
+  // 3. THEME TOGGLE
+function toggleTheme() {
+    const body = document.body;
+    const icon = document.querySelectorAll(".theme-icon");
+    const isLight = body.getAttribute("data-theme") === "light";
+
+    icon.forEach(i => {
+        gsap.to(i, { rotation: 360, duration: 0.6, ease: "back.out(1.7)" });
+    });
+
+    if (isLight) {
+        body.removeAttribute("data-theme");
+
+        icon.forEach(i => i.innerText = "🌙");
+
+        gsap.to(".parallax-sphere", {
+            background: "rgba(124, 58, 237, 0.25)",
+            duration: 1
+        });
+        gsap.to(".parallax-sphere", {
+            opacity: 0.7,
+            duration: 1
+        });
+
+    } else {
+        body.setAttribute("data-theme", "light");
+
+        icon.forEach(i => i.innerText = "☀️");
+
+        gsap.to(".parallax-sphere", {
+            background: "rgba(37, 99, 235, 0.15)",
+            duration: 1
+        });
+        gsap.to(".parallax-sphere", {
+            opacity: 0.25,
+            duration: 1
+        });
+    }
+
+    gsap.fromTo("body",
+        { opacity: 0.85 },
+        { opacity: 1, duration: 0.4 }
+    );
+}
+
+// 4. BENTO ENTRANCE
+window.addEventListener('DOMContentLoaded', () => {
+    const tl = gsap.timeline();
+
+
+    // 1. Set initial "hidden" state
+    gsap.set(".glass, .logo, h2, #overview-grid > div", { 
+        opacity: 0, 
+        y: 30, 
+        filter: "blur(10px)" 
+    });
+
+    // 2. Sexy Entrance Sequence
+    tl.to(".logo", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.8 })
+      .to("#overview-grid > div", { 
+          opacity: 1, 
+          y: 0, 
+          filter: "blur(0px)", 
+          stagger: 0.1, 
+          duration: 0.8, 
+          ease: "back.out(1.7)" 
+      }, "-=0.4")
+      .to("h2, .glass", { 
+          opacity: 1, 
+          y: 0, 
+          filter: "blur(0px)", 
+          stagger: 0.05,
+          duration: 0.8 
+      }, "-=0.6");
+
+      // ===== INDEX STYLE SPHERE KINETICS =====
+
+      gsap.to("#sphere1", {
+        scrollTrigger: { 
+            trigger: document.body,
+            start: 0,
+            end: () => document.body.scrollHeight - window.innerHeight,
+            scrub: 2
+        },
+        y: 500,
+        x: 200,
+        scale: 1.5
+    });
+
+   gsap.to("#sphere2", {
+    scrollTrigger: { 
+        trigger: document.body,
+        start: 0,
+        end: () => document.body.scrollHeight - window.innerHeight,
+        scrub: 2,
+            onUpdate: (self) => {
+                const progress = self.progress;
+                if (progress > 0.4) {
+                    gsap.to(".parallax-sphere", { 
+                        background: "rgba(0, 212, 255, 0.2)", 
+                        duration: 2 
+                    });
+                } else {
+                    gsap.to(".parallax-sphere", { 
+                        background: "rgba(124, 58, 237, 0.3)", 
+                        duration: 2 
+                    });
+                }
+            }
+        },
+        y: -500,
+        x: -200,
+        scale: 0.8
+    });
+
+    // Ensure spheres are visible in Light Mode
+    if (document.body.getAttribute("data-theme") === "light") {
+        gsap.set(".parallax-sphere", { opacity: 0.6, filter: "blur(60px)" });
+    }
+
+    ScrollTrigger.refresh();
+
+    // Header shrink on scroll
+    gsap.to("header", {
+      scrollTrigger: {
+        trigger: document.body,
+        start: 0,
+        end: 200,
+        scrub: true
+      },
+      paddingTop: "12px",
+      paddingBottom: "12px",
+      backgroundColor: "rgba(5,8,16,0.85)"
+    });
+
+  });
+
+
+  const token = sessionStorage.getItem("token");
+
+/* frontend logic (keeps existing behavior) */
+const user = JSON.parse(sessionStorage.getItem("user"));
+document.getElementById("loggedName").innerText = user.name;
+if(!user || user.role !== "patient"){ window.location.href = "login.html"; }
+
+const socket = io("http://localhost:3000");
+
+socket.on("bookingError", (message) => {
+    alert(message);
+});
+
+socket.on("bookingSuccess", () => {
+    window.location.href = "queue.html";
+});
+
+if ("Notification" in window) {
+    Notification.requestPermission();
+}
+
+/* load doctors */
+async function loadDoctors(){
+
+  const aiSpecialist = sessionStorage.getItem("aiSpecialist");
+
+  // ✅ Check if location already stored
+  const storedLat = sessionStorage.getItem("userLat");
+  const storedLng = sessionStorage.getItem("userLng");
+
+  if (storedLat && storedLng) {
+    fetchDoctors(aiSpecialist, storedLat, storedLng);
+    return;
+  }
+
+  // If not stored → ask only once
+  if (!navigator.geolocation) {
+    fetchDoctors(aiSpecialist, null, null);
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(position => {
+
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
+
+    // ✅ Save for future use
+    sessionStorage.setItem("userLat", lat);
+    sessionStorage.setItem("userLng", lng);
+
+    fetchDoctors(aiSpecialist, lat, lng);
+
+  }, () => {
+    fetchDoctors(aiSpecialist, null, null);
+  });
+}
+
+async function fetchDoctors(specialist, lat, lng){
+
+  let url = "http://localhost:3000/doctors";
+
+  const params = [];
+
+  const gender = document.getElementById("genderFilter")?.value;
+
+  if (gender && gender !== "all") {
+    params.push(`gender=${gender}`);
+  }
+
+  if (specialist) {
+    params.push(`specialist=${encodeURIComponent(specialist)}`);
+  }
+
+  if (lat && lng) {
+    params.push(`lat=${lat}`);
+    params.push(`lng=${lng}`);
+  }
+
+  if (params.length > 0) {
+    url += "?" + params.join("&");
+  }
+
+  const res = await fetch(url);
+  const doctors = await res.json();
+
+  sessionStorage.removeItem("aiSpecialist");
+
+  const container = document.getElementById("doctorList");
+  container.innerHTML = "";
+  // Start a quick "Searching" animation
+    gsap.fromTo("#doctorList", { opacity: 0 }, { opacity: 1, duration: 0.5 });
+
+  if (doctors.length === 0) {
+    container.innerHTML = "<p>No matching doctors found.</p>";
+    return;
+  }
+
+  doctors.forEach((doc, index) => {
+    const card = document.createElement("div");
+    // Ensure the card starts at opacity 0 so GSAP can fade it in
+    card.className = "card doc-card-anim opacity-0"; 
+
+    const initials = doc.name.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase();
+
+    card.innerHTML = `
+      <div class="doc-row">
+        <div class="doc-avatar">${initials}</div>
+        <div style="flex:1">
+          <div class="doc-name">${doc.name}</div>
+          <div class="doc-spec">${doc.specialization}</div>
+          ${doc.distance ? `<div style="font-size:12px;color:#94a3b8;">${doc.distance.toFixed(2)} km away</div>` : ""}
+        </div>
+      </div>
+      <div class="doc-details">
+        <div class="fee">₹${doc.consultation_fee}</div>
+        <div style="flex:1"></div>
+        <div class="status ${doc.available ? 'available' : 'off'}">
+          ${doc.available ? 'Available' : 'Not Available'}
+        </div>
+      </div>
+      <div class="card-actions">
+        <input type="date" id="date_${doc.id}" style="margin-bottom:8px;">
+        <button class="primary-btn" onclick="bookDoctor(${doc.id})">Book</button>
+      </div>
+    `;
+
+    container.appendChild(card);
+
+    // This is the fixed GSAP trigger
+    gsap.to(card, {
+      opacity: 1,
+      y: 0,
+      duration: 1,
+      delay: index * 0.1, 
+      ease: "expo.out",
+      startAt: { y: 50 } 
+    });
+  });
+}
+
+
+/* book and preview */
+function bookDoctor(doctorId){
+
+  const selectedDate = document.getElementById("date_" + doctorId).value;
+
+  if(!selectedDate){
+    alert("Please select a date");
+    return;
+  }
+
+  sessionStorage.setItem("selectedDoctor", doctorId);
+
+  socket.emit("bookToken",{
+    patient_id: user.id,
+    doctor_id: doctorId,
+    appointment_date: selectedDate
+  });
+}
+
+
+function viewDoctor(id){
+  alert("Doctor detail demo: feature coming soon");
+}
+
+
+/* prescriptions */
+async function loadPrescriptions(){
+
+  const res = await fetch("http://localhost:3000/patient-prescriptions/" + user.id, {
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  });
+  const prescriptions = await res.json();
+
+  const allContainer = document.getElementById("prescriptionList");
+  const currentContainer = document.getElementById("currentPrescription");
+
+  allContainer.innerHTML = "";
+  currentContainer.innerHTML = "";
+
+  if(!prescriptions || prescriptions.length === 0){
+    currentContainer.innerHTML = "<p>No active prescription</p>";
+    allContainer.innerHTML = "<div class='prescription-card'>No prescriptions yet.</div>";
+    return;
+  }
+
+// Fetch active reminders first
+const reminderRes = await fetch("http://localhost:3000/my-reminders/" + user.id, {
+  headers: {
+    Authorization: "Bearer " + token
+  }
+});
+const activeReminders = await reminderRes.json();
+
+if(activeReminders.length === 0){
+  currentContainer.innerHTML = "<p>No active prescription. Check All Prescriptions.</p>";
+} else {
+
+  // Find prescription that contains at least one active medicine
+ let activePrescriptions = [];
+
+for(let p of prescriptions){
+
+  let hasActiveMedicine = false;
+
+  for(let med of p.medicines){
+
+    const isActive = activeReminders.some(r => 
+      r.medicine_name === med.medicine_name
+    );
+
+    if(isActive){
+      hasActiveMedicine = true;
+      break;
+    }
+  }
+
+  if(hasActiveMedicine){
+    activePrescriptions.push(p);
+  }
+}
+
+if(activePrescriptions.length > 0){
+
+  activePrescriptions.forEach(p => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "prescription-card";
+    wrapper.style.marginBottom = "15px";
+    wrapper.innerHTML = buildPrescriptionHTML(p);
+    currentContainer.appendChild(wrapper);
+  });
+
+} else {
+  currentContainer.innerHTML = "<p>No active prescription. Check All Prescriptions.</p>";
+}
+
+  // ---- SHOW ALL IN MENU ----
+  prescriptions.forEach(p => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "prescription-card";
+    wrapper.innerHTML = buildPrescriptionHTML(p);
+    allContainer.appendChild(wrapper);
+  });
+}
+}
+
+function buildPrescriptionHTML(p){
+
+  let medicineRows = "";
+
+  p.medicines.forEach(med => {
+    medicineRows += `
+      <tr>
+        <td>${med.medicine_name}</td>
+        <td>${med.morning || '-'}</td>
+        <td>${med.afternoon || '-'}</td>
+        <td>${med.night || '-'}</td>
+        <td>${med.duration_days} days</td>
+      </tr>
+    `;
+  });
+
+  return `
+    <strong>Dr. ${p.doctor_name}</strong>
+    <div style="margin:6px 0;">
+      Date: ${new Date(p.created_at).toLocaleDateString()}
+    </div>
+
+    <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+      <thead>
+        <tr style="background: var(--accent); color: var(--btn-text);">
+          <th style="padding:6px; border:1px solid #ddd;">Medicine</th>
+          <th style="padding:6px; border:1px solid #ddd;">Morning</th>
+          <th style="padding:6px; border:1px solid #ddd;">Afternoon</th>
+          <th style="padding:6px; border:1px solid #ddd;">Night</th>
+          <th style="padding:6px; border:1px solid #ddd;">Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${medicineRows}
+      </tbody>
+    </table>
+  `;
+}
+
+/* queue preview (shows first waiting token for selected doctor if exists) */
+async function refreshQueuePreview(){
+  const docId = sessionStorage.getItem("selectedDoctor");
+  if(!docId){ document.getElementById("queuePreview").innerHTML = '<div style="color:var(--muted)">No active appointment</div>'; return; }
+  const today = new Date().toISOString().slice(0,10);
+
+  const res = await fetch(
+    "http://localhost:3000/doctor-live-queue/" + docId + "?date=" + today
+  );
+  const queue = await res.json();
+  const first = queue && queue.length ? queue[0] : null;
+  if(first){
+    document.getElementById("queuePreview").innerHTML = `<div style="font-weight:700">Next Token: ${first.token_number}</div>
+      <div style="color:var(--muted);margin-top:8px">Expected: ${first.expected_time}</div>`;
+  } else {
+    document.getElementById("queuePreview").innerHTML = '<div style="color:var(--muted)">No active appointment</div>';
+  }
+}
+
+/* logout */
+function logout(){ sessionStorage.removeItem("user"); window.location.href = "login.html"; }
+
+/* init */
+loadDoctors();
+loadPrescriptions();
+refreshQueuePreview();
+loadReminders();
+loadSummary();
+
+/* listen realtime for updates and refresh preview */
+socket.on("connect", ()=>{ refreshQueuePreview(); });
+socket.on("queueUpdated", (data) => {
+
+    const selectedDoctor = sessionStorage.getItem("selectedDoctor");
+
+    if(selectedDoctor && data.doctorId == selectedDoctor){
+
+        refreshQueuePreview();
+        loadSummary();   // update health cards live
+
+    }
+
+});
+
+socket.on("nextTurnAlert", (data) => {
+
+    if (data.patientId === user.id) {
+
+        alert("🔔 It's your turn next! Please be ready.");
+
+        if (Notification.permission === "granted") {
+            new Notification("HealSync Alert", {
+                body: "It's your turn next!",
+                icon: "https://cdn-icons-png.flaticon.com/512/2966/2966327.png"
+            });
+        }
+    }
+});
+
+/* ---------------- MEDICINE REMINDER LISTENER ---------------- */
+
+socket.on("medicineReminder", (data) => {
+
+    if (data.patientId !== user.id) return;
+
+    showInAppReminder(data.medicineName, data.timeOfDay);
+    showBrowserNotification(data.medicineName, data.timeOfDay);
+
+});
+
+function showInAppReminder(medicineName, timeOfDay){
+
+    const div = document.createElement("div");
+    div.style.position = "fixed";
+    div.style.bottom = "20px";
+    div.style.right = "20px";
+    div.style.background = "#111827";
+    div.style.color = "white";
+    div.style.padding = "15px 20px";
+    div.style.borderRadius = "10px";
+    div.style.boxShadow = "0 0 15px rgba(0,0,0,0.5)";
+    div.style.zIndex = "9999";
+
+    div.innerHTML = `
+        💊 Time to take <strong>${medicineName}</strong> (${timeOfDay})
+    `;
+
+    document.body.appendChild(div);
+
+    setTimeout(() => {
+        div.remove();
+    }, 10000);
+}
+
+function showBrowserNotification(medicineName, timeOfDay){
+
+    if (Notification.permission === "granted") {
+        new Notification("HealSync Reminder", {
+            body: `Take ${medicineName} (${timeOfDay})`,
+            icon: "https://cdn-icons-png.flaticon.com/512/2966/2966327.png"
+        });
+    }
+}
+
+function openReminderModal(){
+    document.getElementById("reminderModal").style.display = "flex";
+}
+
+function closeReminderModal(){
+    document.getElementById("reminderModal").style.display = "none";
+}
+
+async function saveReminder(){
+
+    const morningChecked = document.getElementById("mMorning").checked;
+    const afternoonChecked = document.getElementById("mAfternoon").checked;
+    const nightChecked = document.getElementById("mNight").checked;
+
+    const body = {
+        patient_id: user.id,
+        medicine_name: document.getElementById("medName").value,
+        morning: morningChecked ? 1 : 0,
+        afternoon: afternoonChecked ? 1 : 0,
+        night: nightChecked ? 1 : 0,
+        morning_time: morningChecked ? document.getElementById("mMorningTime").value + ":00" : null,
+        afternoon_time: afternoonChecked ? document.getElementById("mAfternoonTime").value + ":00" : null,
+        night_time: nightChecked ? document.getElementById("mNightTime").value + ":00" : null,
+        duration_days: document.getElementById("mDays").value
+    };
+
+  const res = await fetch("http://localhost:3000/add-reminder", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token
+    },
+    body: JSON.stringify(body)
+  });
+
+    if (!res.ok) {
+        alert("Error saving reminder");
+        return;
+    }
+
+    alert("Reminder saved successfully!");
+    closeReminderModal();
+}
+
+async function loadReminders(){
+
+    const res = await fetch("http://localhost:3000/my-reminders/" + user.id, {
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+    const reminders = await res.json();
+
+    const container = document.getElementById("reminderList");
+    container.innerHTML = "";
+
+    if(reminders.length === 0){
+        container.innerHTML = "<p>No active reminders</p>";
+        return;
+    }
+
+    reminders.forEach(r => {
+
+        const div = document.createElement("div");
+        div.style.background = "#111827";
+        div.style.padding = "15px";
+        div.style.marginBottom = "10px";
+        div.style.borderRadius = "10px";
+        div.style.color = "white";
+
+        div.innerHTML = `
+            <strong>${r.medicine_name}</strong> 
+            <span style="color:#94a3b8;">(${r.source})</span><br>
+            Morning: ${r.morning_time || "-"} |
+            Afternoon: ${r.afternoon_time || "-"} |
+            Night: ${r.night_time || "-"}<br>
+            Ends on: ${r.end_date}<br><br>
+
+            <div style="margin-top:10px;">
+              <button onclick="markTaken(${r.id}, 'morning')"
+                  style="padding:6px 12px;border:none;border-radius:20px;background:#16a34a;color:white;margin-right:5px;">
+                  Mark Morning
+              </button>
+
+              <button onclick="markTaken(${r.id}, 'afternoon')"
+                  style="padding:6px 12px;border:none;border-radius:20px;background:#16a34a;color:white;margin-right:5px;">
+                  Mark Afternoon
+              </button>
+
+              <button onclick="markTaken(${r.id}, 'night')"
+                  style="padding:6px 12px;border:none;border-radius:20px;background:#16a34a;color:white;margin-right:5px;">
+                  Mark Night
+              </button>
+
+              <button onclick="deleteReminder(${r.id})"
+                  style="padding:6px 12px;border:none;border-radius:20px;background:#dc2626;color:white;">
+                  Delete
+              </button>
+
+              <button onclick="snooze(${r.id}, 'morning')"
+                style="padding:6px 12px;border:none;border-radius:20px;background:#f59e0b;color:white;margin-right:5px;">
+                Snooze 10m
+            </button>
+          </div>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+async function deleteReminder(id){
+
+    await fetch("http://localhost:3000/delete-reminder/" + id, {
+        method: "DELETE"
+    });
+
+    loadReminders();
+}
+
+async function markTaken(id, timeOfDay){
+
+    await fetch("http://localhost:3000/mark-taken", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, timeOfDay })
+    });
+
+    alert("Marked as taken!");
+}
+
+async function snooze(id, timeOfDay){
+
+    await fetch("http://localhost:3000/snooze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, timeOfDay })
+    });
+
+    alert("Snoozed for 10 minutes");
+}
+
+async function loadSummary(){
+
+    const res = await fetch("http://localhost:3000/patient-summary/" + user.id, {
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+    const data = await res.json();
+
+    document.getElementById("activeAppointments").innerText =
+        data.activeAppointments || 0;
+
+    document.getElementById("activeReminders").innerText =
+        data.activeReminders || 0;
+
+    if(data.latestReminder){
+        document.getElementById("latestReminder").innerText =
+            data.latestReminder.medicine_name;
+    } else {
+        document.getElementById("latestReminder").innerText = "None";
+    }
+}
+
+async function findMedicine(){
+
+    const name = document.getElementById("searchMedicine").value;
+    const lat = sessionStorage.getItem("userLat");
+    const lng = sessionStorage.getItem("userLng");
+
+    let url = `http://localhost:3000/find-medicine?name=${encodeURIComponent(name)}`;
+
+    if(lat && lng){
+        url += `&lat=${lat}&lng=${lng}`;
+    }
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const container = document.getElementById("pharmacyResults");
+    container.innerHTML = "";
+
+    if(data.length === 0){
+        container.innerHTML = "No pharmacy found";
+        return;
+    }
+
+    data.forEach(p => {
+
+        const div = document.createElement("div");
+        div.style.background = "#111827";
+        div.style.color = "white";
+        div.style.padding = "12px";
+        div.style.marginBottom = "10px";
+        div.style.borderRadius = "8px";
+
+        div.innerHTML = `
+            <strong>${p.name}</strong><br>
+            ${p.distance ? p.distance.toFixed(2) + " km away<br>" : ""}
+            Quantity: ${p.quantity > 0 ? p.quantity : "Out of Stock"}<br>
+            <button onclick="window.location.href='tel:${p.phone}'"
+                style="margin-top:5px;padding:6px 12px;border:none;border-radius:20px;background:#2563eb;color:white;">
+                Call
+            </button>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+function toggleMenu() {
+    const menu = document.getElementById("sideMenu");
+    // We need to actually SET the style, not just compare it
+    if (menu.style.left === "0px") {
+        menu.style.left = "-350px";
+        menu.style.boxShadow = "none";
+    } else {
+        menu.style.left = "0px";
+        menu.style.boxShadow = "50px 0 100px rgba(0,0,0,0.5)";
+    }
+}
+
+function showSection(section) {
+
+    const reminder = document.getElementById("reminderSection");
+    const pharmacy = document.getElementById("pharmacySection");
+    const prescription = document.getElementById("prescriptionSection");
+
+    // Always keep dashboardSection visible
+    document.getElementById("dashboardSection").style.display = "block";
+
+    // Hide optional sections
+    reminder.style.display = "none";
+    pharmacy.style.display = "none";
+    prescription.style.display = "none";
+
+    if(section === "reminders") {
+        reminder.style.display = "block";
+    }
+
+    if(section === "pharmacy") {
+        pharmacy.style.display = "block";
+    }
+
+    if(section === "prescriptions") {
+        prescription.style.display = "block";
+    }
+
+    toggleMenu();
+}
+
+</script>
+
+<div id="reminderModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); justify-content:center; align-items:center;">
+  <div style="background: var(--bg); color: var(--text); border: 1px solid var(--border); padding:25px; border-radius:12px; width:500px;">
+
+    <h2>Add Medicine Reminder</h2>
+
+    <input id="medName" placeholder="Medicine Name"><br><br>
+
+    Morning <input type="checkbox" id="mMorning">
+    <input type="time" id="mMorningTime"><br><br>
+
+    Afternoon <input type="checkbox" id="mAfternoon">
+    <input type="time" id="mAfternoonTime"><br><br>
+
+    Night <input type="checkbox" id="mNight">
+    <input type="time" id="mNightTime"><br><br>
+
+    Duration (days):
+    <input type="number" id="mDays"><br><br>
+
+    <button class="primary-btn" onclick="saveReminder()">Save</button>
+    <button class="secondary-btn" onclick="closeReminderModal()">Cancel</button>
+
+  </div>
+</div>
+
+</body>
+</html>

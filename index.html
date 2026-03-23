@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealSync AI | Next-Gen Triage</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #050810;
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --text: #ffffff;
+            --subtext: #94a3b8;
+            --border: rgba(255, 255, 255, 0.08);
+            --accent: #00d4ff;
+            --glow: rgba(124, 58, 237, 0.3);
+            --btn-text: #000000;
+        }
+
+        [data-theme="light"] {
+            --bg: #f8fafc;
+            --card-bg: rgba(0, 0, 0, 0.03);
+            --text: #0f172a;
+            --subtext: #475569;
+            --border: rgba(0, 0, 0, 0.1);
+            --accent: #2563eb;
+            --glow: rgba(37, 99, 235, 0.1);
+            --btn-text: #ffffff;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            transition: background 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-x: hidden;
+        }
+
+        .glass {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+        }
+
+        .magnetic-wrap { display: inline-block; }
+
+        .parallax-sphere {
+            position: fixed; /* Spheres now stay in the viewport while scrolling */
+            border-radius: 50%;
+            transition: background 1.5s ease; /* Smooth color transition */
+            filter: blur(60px);
+            background: var(--glow);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .text-gradient {
+            background: linear-gradient(135deg, var(--accent), #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #custom-cursor {
+            width: 20px; height: 20px;
+            background: var(--accent);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 99999;
+            mix-blend-mode: difference;
+            transition: transform 0.2s ease;
+        }
+
+        .step-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-10px);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="custom-cursor"></div>
+
+    <div class="fixed top-8 right-8 md:right-12 z-50">
+        <button onclick="toggleTheme()" class="glass p-3 rounded-full hover:scale-110 transition-transform shadow-xl">
+            <span id="theme-icon" class="text-xl">🌙</span>
+        </button>
+    </div>
+
+    <div class="parallax-sphere w-96 h-96 top-0 -left-20" id="sphere1"></div>
+    <div class="parallax-sphere w-[500px] h-[500px] bottom-0 -right-20" id="sphere2"></div>
+
+    <nav class="flex justify-between items-center px-8 py-8 max-w-7xl mx-auto relative z-10">
+        <div class="logo text-3xl font-black tracking-tighter uppercase" id="nav-logo">
+            Heal<span class="text-gradient">Sync</span>
+        </div>
+        <button class="glass px-6 py-2 rounded-full font-bold hover:bg-white/10 transition-all" onclick="window.location.href='login.html'">
+            Doctor Portal
+        </button>
+    </nav>
+
+    <section class="relative min-h-[90vh] flex flex-col justify-center items-center px-4 overflow-hidden">
+        <div class="text-center z-10 hero-content" id="hero-main">
+            <div class="inline-block glass px-4 py-1 rounded-full text-xs font-bold tracking-widest uppercase mb-6" id="hero-tag" style="opacity: 0;">
+                ✨ Next Gen Triage System
+            </div>
+            <h1 class="text-5xl md:text-[110px] font-black leading-[0.9] tracking-tighter mb-8" id="hero-title" style="opacity: 0;">
+                DECODE <br> <span class="text-gradient">SYMPTOMS</span>
+            </h1>
+            <p class="max-w-xl mx-auto text-lg mb-12" id="hero-desc" style="opacity: 0;">
+                A hyper-intelligent medical layer that connects your symptoms to the right specialist in milliseconds.
+            </p>
+            
+            <div class="flex gap-6 flex-wrap justify-center" id="hero-btns" style="opacity: 0;">
+                <div class="magnetic-wrap">
+                    <button class="bg-white text-black px-10 py-5 rounded-2xl font-black text-lg hover:scale-105 transition-all shadow-2xl" onclick="goToAI()" style="color: var(--btn-text); background-color: var(--text);">
+                        LAUNCH AI
+                    </button>
+                </div>
+                <div class="magnetic-wrap">
+                    <button class="glass px-10 py-5 rounded-2xl font-black text-lg hover:bg-white/5 transition-all" onclick="goToConsult()">
+                        CONSULT DOCTOR
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-32 px-6 max-w-7xl mx-auto relative z-10">
+        <h2 class="text-4xl md:text-6xl font-black text-center mb-20 tracking-tighter" id="steps-title">
+            HOW IT <span class="text-gradient">WORKS</span>
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6" id="steps-grid">
+            <div class="step-card glass p-8 rounded-[2rem] border border-white/10 flex flex-col items-start transition-all duration-500">
+                <div class="text-5xl mb-6 bg-white/5 w-16 h-16 flex items-center justify-center rounded-2xl shadow-inner">💬</div>
+                <h3 class="text-2xl font-bold mb-3">Symptom Input</h3>
+                <p class="opacity-60 text-sm leading-relaxed">Describe your condition in plain English. Our AI understands natural language, no medical jargon required.</p>
+            </div>
+            <div class="step-card glass p-8 rounded-[2rem] border border-white/10 flex flex-col items-start transition-all duration-500 md:mt-12">
+                <div class="text-5xl mb-6 bg-white/5 w-16 h-16 flex items-center justify-center rounded-2xl">🧠</div>
+                <h3 class="text-2xl font-bold mb-3">AI Analysis</h3>
+                <p class="opacity-60 text-sm leading-relaxed">The Gemini 2.5 engine analyzes severity and matches you with the exact specialist you need instantly.</p>
+            </div>
+            <div class="step-card glass p-8 rounded-[2rem] border border-white/10 flex flex-col items-start transition-all duration-500">
+                <div class="text-5xl mb-6 bg-white/5 w-16 h-16 flex items-center justify-center rounded-2xl">🎫</div>
+                <h3 class="text-2xl font-bold mb-3">Geo Tokens</h3>
+                <p class="opacity-60 text-sm leading-relaxed">Queue up digitally from home. Our system detects your arrival via geolocation for a seamless check-in.</p>
+            </div>
+            <div class="step-card glass p-8 rounded-[2rem] border border-white/10 flex flex-col items-start transition-all duration-500 md:mt-12">
+                <div class="text-5xl mb-6 bg-white/5 w-16 h-16 flex items-center justify-center rounded-2xl">📋</div>
+                <h3 class="text-2xl font-bold mb-3">Digital Care</h3>
+                <p class="opacity-60 text-sm leading-relaxed">Access your automated prescriptions and set smart medicine reminders directly from your dashboard.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="py-12 text-center opacity-40 text-sm border-t border-white/10">
+        © 2026 HealSync AI • Belagavi, India
+    </footer>
+
+    <script>
+        gsap.registerPlugin(ScrollTrigger);
+
+        // 1. CUSTOM CURSOR
+        const cursor = document.querySelector("#custom-cursor");
+        document.addEventListener("mousemove", (e) => {
+            gsap.to(cursor, { x: e.clientX, y: e.clientY, duration: 0.1 });
+        });
+        // 2.1 FULL HERO KINETIC TILT
+        document.addEventListener("mousemove", (e) => {
+            const xPos = (e.clientX / window.innerWidth - 0.5) * 40;
+            const yPos = (e.clientY / window.innerHeight - 0.5) * 40;
+            
+            // Tilts the entire hero section (Title, Tag, Description, Buttons)
+            gsap.to(".hero-content", { 
+                x: xPos, 
+                y: yPos, 
+                rotationY: xPos * 0.1, 
+                rotationX: -yPos * 0.1, 
+                duration: 1.2, 
+                ease: "power2.out" 
+            });
+        });
+
+        // 2. MAGNETIC BUTTONS PHYSICS
+        document.querySelectorAll(".magnetic-wrap").forEach(wrap => {
+            const btn = wrap.querySelector("button");
+            wrap.addEventListener("mousemove", (e) => {
+                const rect = wrap.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                gsap.to(btn, { x: x * 0.4, y: y * 0.4, duration: 0.3 });
+            });
+            wrap.addEventListener("mouseleave", () => {
+                gsap.to(btn, { x: 0, y: 0, duration: 0.5, ease: "elastic.out(1, 0.3)" });
+            });
+        });
+
+        // 3. ENTRANCE ANIMATIONS
+        window.addEventListener('DOMContentLoaded', () => {
+            const tl = gsap.timeline();
+            tl.to("#hero-tag", { opacity: 1, y: -10, duration: 1, ease: "expo.out" })
+              .to("#hero-title", { opacity: 1, y: 0, duration: 1.2, ease: "expo.out" }, "-=0.7")
+              .to("#hero-desc", { opacity: 0.6, y: 0, duration: 1 }, "-=0.9")
+              .to("#hero-btns", { opacity: 1, y: 0, duration: 1 }, "-=0.8");
+        });
+
+        // 4. FIXED SPHERE KINETICS & COLOR MORPH
+        gsap.to("#sphere1", {
+            scrollTrigger: { 
+                trigger: "body",
+                start: "top top",
+                end: "bottom bottom",
+                scrub: 2 
+            },
+            y: 500, // Moves down as you scroll
+            x: 200,
+            scale: 1.5
+        });
+
+        gsap.to("#sphere2", {
+            scrollTrigger: { 
+                trigger: "body",
+                start: "top top",
+                end: "bottom bottom",
+                scrub: 2,
+                // Color Morph Trigger
+                onUpdate: (self) => {
+                    const progress = self.progress;
+                    if (progress > 0.4) {
+                        // Change to Mint/Cyan when reaching "How it Works"
+                        gsap.to(".parallax-sphere", { background: "rgba(0, 212, 255, 0.2)", duration: 2 });
+                    } else {
+                        // Back to Purple/Glow at the top
+                        gsap.to(".parallax-sphere", { background: "rgba(124, 58, 237, 0.3)", duration: 2 });
+                    }
+                }
+            },
+            y: -500,
+            x: -200,
+            scale: 0.8
+        });
+
+        // 5. BENTO GRID REVEAL
+        gsap.from(".step-card", {
+            scrollTrigger: {
+                trigger: "#steps-grid",
+                start: "top 85%",
+                toggleActions: "play none none none"
+            },
+            y: 100,
+            opacity: 0,
+            scale: 0.9,
+            stagger: 0.2,
+            duration: 1.2,
+            ease: "expo.out",
+            clearProps: "all"
+        });
+
+        // Bonus: Subtle floating animation for cards
+        gsap.to(".step-card", {
+            y: "-=10",
+            duration: 2,
+            repeat: -1,
+            yoyo: true,
+            ease: "sine.inOut",
+            stagger: {
+                each: 0.2,
+                from: "random"
+            }
+        });
+
+        // 6. THEME TOGGLE ENGINE
+        function toggleTheme() {
+            const body = document.body;
+            const icon = document.querySelector("#theme-icon");
+            const isLight = body.getAttribute("data-theme") === "light";
+            
+            if (isLight) {
+                body.removeAttribute("data-theme");
+                icon.innerText = "🌙";
+            } else {
+                body.setAttribute("data-theme", "light");
+                icon.innerText = "☀️";
+            }
+            
+            gsap.from(".parallax-sphere", { filter: "blur(0px)", opacity: 0, duration: 1 });
+        }
+
+        // LOGIC FUNCTIONS
+        function goToAI(){
+            sessionStorage.setItem("redirectAfterLogin", "chatbot.html");
+            window.location.href="login.html";
+        }
+
+        function goToConsult(){
+            sessionStorage.setItem("redirectAfterLogin", "patient-dashboard.html");
+            window.location.href="login.html";
+        }
+    </script>
+</body>
+</html>

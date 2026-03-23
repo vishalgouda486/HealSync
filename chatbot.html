@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealSync AI | Diagnostic Terminal</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+       :root {
+            --bg: #050810;
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --text: #ffffff;
+            --input-text: #ffffff; /* New variable for input visibility */
+            --accent: #00d4ff;
+            --glow: rgba(124, 58, 237, 0.3);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="light"] {
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --input-text: #1e293b;
+            --accent: #2563eb;
+            --glow: rgba(37, 99, 235, 0.1);
+            --border: rgba(0, 0, 0, 0.15); /* Darker border for light mode */
+        }
+
+        /* Ensure borders are always visible and distinct */
+        input, textarea {
+            color: var(--input-text) !important;
+            background-color: var(--card-bg) !important;
+            border: 2px solid var(--border) !important; /* Force thick border */
+            transition: all 0.3s ease;
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 15px var(--glow) !important;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            transition: background 0.5s ease;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .glass {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+        }
+
+        .text-gradient {
+            background: linear-gradient(135deg, var(--accent), #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .scan-line {
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            position: absolute; top: 0; left: 0; opacity: 0; pointer-events: none;
+        }
+
+        #custom-cursor {
+            width: 20px; height: 20px;
+            background: var(--accent);
+            border-radius: 50%;
+            position: fixed; pointer-events: none; z-index: 99999;
+            mix-blend-mode: difference;
+        }
+
+        .terminal-glow { box-shadow: 0 0 50px rgba(0, 212, 255, 0.05); }
+
+        /* Medical Cross Particles */
+        .particle {
+            position: absolute;
+            width: 15px; height: 15px;
+            background: var(--accent);
+            clip-path: polygon(33% 0%, 66% 0%, 66% 33%, 100% 33%, 100% 66%, 66% 66%, 66% 100%, 33% 100%, 33% 66%, 0% 66%, 0% 33%, 33% 33%);
+            opacity: 0.2;
+            pointer-events: none;
+        }
+
+        .bg-grid {
+            position: fixed; inset: 0;
+            background-image: linear-gradient(var(--accent) 1px, transparent 1px), linear-gradient(90deg, var(--accent) 1px, transparent 1px);
+            background-size: 50px 50px; opacity: 0.03; z-index: -1;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 30px rgba(0, 212, 255, 0.05); }
+            50% { box-shadow: 0 0 60px rgba(0, 212, 255, 0.15); }
+        }
+        .terminal-pulse { animation: pulse-glow 4s infinite ease-in-out; }
+
+        .parallax-sphere { position: fixed; border-radius: 50%; filter: blur(80px); z-index: -1; }
+    </style>
+</head>
+<body>
+    <div id="custom-cursor"></div>
+    <div class="bg-grid"></div>
+    <div id="particle-container"></div>
+
+    <div class="fixed top-8 right-8 z-50">
+        <button onclick="toggleTheme()" class="glass p-3 rounded-full hover:scale-110 transition-transform">
+            <span id="theme-icon">🌙</span>
+        </button>
+    </div>
+
+    <div class="parallax-sphere w-96 h-96 -top-20 -left-20" id="sphere1" style="background: rgba(124, 58, 237, 0.2);"></div>
+    <div class="parallax-sphere w-64 h-64 bottom-10 right-10" id="sphere2" style="background: rgba(0, 212, 255, 0.2);"></div>
+
+    <header class="p-8 flex flex-col md:flex-row justify-between items-start md:items-center relative z-10 gap-4">
+            <div class="logo text-2xl font-black tracking-tighter uppercase cursor-pointer" onclick="window.location.href='index.html'">
+                Heal<span class="text-gradient">Sync</span>
+            </div>
+            
+            <div class="flex items-center gap-8 md:mr-32">
+                <div class="text-xs font-mono opacity-50 tracking-widest uppercase">
+                    System Status: <span class="text-emerald-400">Online</span>
+                </div>
+            </div>
+    </header>
+
+    <main class="container mx-auto px-4 h-[80vh] flex items-center justify-center relative z-10">
+        
+        <div class="glass w-full max-w-2xl p-10 rounded-[2.5rem] terminal-glow terminal-pulse relative overflow-hidden" id="terminal-window">
+            
+            <div class="scan-line" id="scanner"></div>
+
+            <div class="mb-8">
+                <h2 class="text-3xl font-black mb-2 uppercase tracking-tighter">Diagnostic <span class="text-gradient">Input</span></h2>
+                <p class="opacity-50 text-sm">Please provide age and detailed symptoms for AI analysis.</p>
+            </div>
+
+            <div class="space-y-6">
+                <div class="relative">
+                    <input type="number" id="age" placeholder="Patient Age" 
+                        class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl text-white font-bold transition-all">
+                </div>
+
+                <div class="relative">
+                    <textarea id="symptoms" placeholder="Describe how you feel (e.g., 'Sharp pain in lower back for 2 days')..." 
+                        class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl h-40 text-white leading-relaxed transition-all resize-none"></textarea>
+                </div>
+
+                <button class="w-full bg-white text-black py-5 rounded-2xl font-black text-lg hover:invert transition-all flex items-center justify-center gap-3" 
+                        id="analyzeBtn" onclick="analyze()">
+                    <span>RUN DIAGNOSTIC</span>
+                    <div id="loader" class="hidden w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                </button>
+            </div>
+
+            <div id="result" class="mt-10 pt-10 border-t border-white/5 hidden"></div>
+        </div>
+
+    </main>
+
+    <script>
+        // 1. CREATE FLOATING MEDICAL CROSSES
+        const container = document.getElementById('particle-container');
+        for (let i = 0; i < 15; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.left = `${Math.random() * 100}vw`;
+            p.style.top = `${Math.random() * 100}vh`;
+            p.style.transform = `rotate(${Math.random() * 360}deg) scale(${Math.random() * 0.5 + 0.5})`;
+            container.appendChild(p);
+
+            gsap.to(p, {
+                x: "random(-150, 150)",
+                y: "random(-150, 150)",
+                rotation: "+=360",
+                duration: "random(15, 25)",
+                repeat: -1,
+                yoyo: true,
+                ease: "sine.inOut"
+            });
+        }
+
+        // 2. THEME TOGGLE
+        function toggleTheme() {
+            const body = document.body;
+            const icon = document.querySelector("#theme-icon");
+            if (body.getAttribute("data-theme") === "light") {
+                body.removeAttribute("data-theme");
+                icon.innerText = "🌙";
+            } else {
+                body.setAttribute("data-theme", "light");
+                icon.innerText = "☀️";
+            }
+        }
+
+        // 3. MOUSE REACTION
+        document.addEventListener("mousemove", (e) => {
+            const x = (e.clientX / window.innerWidth - 0.5) * 40;
+            const y = (e.clientY / window.innerHeight - 0.5) * 40;
+
+            gsap.to(".particle", {
+                x: (i) => x * (i * 0.2),
+                y: (i) => y * (i * 0.2),
+                duration: 2,
+                ease: "power2.out"
+            });
+
+            gsap.to("#terminal-window", {
+                rotationY: x * 0.1,
+                rotationX: -y * 0.1,
+                transformPerspective: 1000,
+                duration: 1
+            });
+        });
+
+        // 4. KINETIC CURSOR
+        const cursor = document.querySelector("#custom-cursor");
+        document.addEventListener("mousemove", (e) => {
+            gsap.to(cursor, { x: e.clientX, y: e.clientY, duration: 0.1 });
+        });
+
+        // 5. ENTRANCE ANIMATION
+        gsap.from("#terminal-window", {
+            scale: 0.9,
+            opacity: 0,
+            y: 50,
+            duration: 1.5,
+            ease: "expo.out"
+        });
+
+        // 6. SCANNING EFFECT
+        const symptomsInput = document.getElementById("symptoms");
+        const scanner = document.getElementById("scanner");
+
+
+        // 7. ANALYZE LOGIC
+       async function analyze() {
+            const ageInput = document.getElementById("age").value;
+            const symptomsText = document.getElementById("symptoms").value;
+
+            let user = JSON.parse(sessionStorage.getItem("user"));
+
+            // TEMP FIX if no login
+            if (!user) {
+                user = { id: 1 }; // dummy patient id
+            }
+
+            if (!ageInput || !symptomsText) {
+                alert("Age and symptoms required for diagnosis.");
+                return;
+            }
+
+            // TRIGGER SCANNING ANIMATION HERE
+            gsap.to(scanner, { opacity: 0.8, y: 0, duration: 0.1 });
+            gsap.to(scanner, { y: 450, duration: 1.5, repeat: -1, yoyo: true, ease: "power1.inOut" });
+
+            const btn = document.getElementById("analyzeBtn");
+            const loader = document.getElementById("loader");
+            const resultDiv = document.getElementById("result");
+
+            btn.disabled = true;
+            loader.classList.remove("hidden");
+            btn.querySelector('span').innerText = "ANALYZING...";
+
+            try {
+                const res = await fetch("http://localhost:3000/analyze-symptoms", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ patient_id: user.id, age: ageInput, symptoms: symptomsText })
+                });
+
+                const data = await res.json();
+
+                resultDiv.classList.remove("hidden");
+                gsap.from(resultDiv, { opacity: 0, y: 20, duration: 1 });
+
+                resultDiv.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold uppercase tracking-widest opacity-40">Severity Level</span>
+                            <span class="px-3 py-1 rounded-full text-xs font-bold uppercase ${data.severity === 'emergency' ? 'bg-red-500 text-white' : 'bg-emerald-500/20 text-emerald-400'}">
+                                ${data.severity}
+                            </span>
+                        </div>
+                        <h3 class="text-2xl font-black tracking-tighter uppercase">Suggested: <span class="text-gradient">${data.specialist}</span></h3>
+                        
+                        ${data.severity === 'low' && data.otc_advice ? `<p class="glass p-5 rounded-2xl border-emerald-500/20 text-emerald-300"><strong>OTC Advice:</strong> ${data.otc_advice}</p>` : ""}
+                        
+                        <div class="flex gap-4 mt-6">
+                            ${data.severity === 'emergency' ? 
+                                `<button class="flex-1 bg-red-600 p-4 rounded-xl font-bold text-white" onclick="window.location.href='emergency.html'">EMERGENCY OPTIONS</button>` : 
+                                `<button class="flex-1 glass p-4 rounded-xl font-bold border-white/10 hover:bg-white/5" onclick="redirectToDoctors('${data.specialist}')">CONSULT DOCTOR</button>`
+                            }
+                        </div>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error("Analysis Error:", error);
+            } finally {
+                btn.disabled = false;
+                loader.classList.add("hidden");
+                btn.querySelector('span').innerText = "RUN DIAGNOSTIC";
+                gsap.to(scanner, { opacity: 0, duration: 0.5 });
+            }
+        }
+
+        function redirectToDoctors(spec) {
+            sessionStorage.setItem("aiSpecialist", spec);
+            window.location.href = "patient-dashboard.html";
+        }
+    </script>
+</body>
+</html>

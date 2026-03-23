@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Emergency Services - HealSync</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body{
+      margin:0;
+      font-family:Poppins, sans-serif;
+      background:#0f172a;
+      color:white;
+      text-align:center;
+      padding:40px;
+    }
+
+    .card{
+      max-width:600px;
+      margin:auto;
+      background:#1f2937;
+      padding:30px;
+      border-radius:20px;
+    }
+
+    .btn{
+      margin-top:20px;
+      padding:14px 30px;
+      border-radius:30px;
+      border:none;
+      font-weight:600;
+      cursor:pointer;
+    }
+
+    .call{
+      background:#dc2626;
+      color:white;
+    }
+
+    .ambulance{
+      background:#7c3aed;
+      color:white;
+    }
+
+    .back{
+      background:#00d4ff;
+      color:black;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+    <h1>🚑 Emergency Services</h1>
+
+    <p>If this is a medical emergency, call immediately.</p>
+
+    <button class="btn call" onclick="callEmergency()">
+      📞 Call 108
+    </button>
+
+    <button class="btn ambulance" onclick="requestAmbulance()">
+      🚑 Request Ambulance
+    </button>
+
+    <button class="btn back" onclick="goBack()">
+      Back to Dashboard
+    </button>
+  </div>
+
+<script>
+
+const storedLat = sessionStorage.getItem("userLat");
+const storedLng = sessionStorage.getItem("userLng");
+
+loadHospitals();
+
+async function loadHospitals(){
+
+    let url = "http://localhost:3000/emergency-hospitals";
+
+    if (storedLat && storedLng) {
+        url += `?lat=${storedLat}&lng=${storedLng}`;
+    }
+
+    const res = await fetch(url);
+    const hospitals = await res.json();
+
+    const container = document.createElement("div");
+    container.style.marginTop = "30px";
+
+    hospitals.slice(0,3).forEach(h => {
+
+        const div = document.createElement("div");
+        div.style.marginBottom = "15px";
+        div.style.padding = "15px";
+        div.style.background = "#111827";
+        div.style.borderRadius = "10px";
+
+        div.innerHTML = `
+            <strong>${h.name}</strong><br>
+            ${h.distance ? h.distance.toFixed(2) + " km away<br>" : ""}
+            <button onclick="window.location.href='tel:${h.phone}'"
+                style="margin-top:8px;padding:8px 15px;border:none;border-radius:20px;background:#dc2626;color:white;">
+                Call Hospital
+            </button>
+        `;
+
+        container.appendChild(div);
+    });
+
+    document.querySelector(".card").appendChild(container);
+}
+
+function callEmergency(){
+    window.location.href = "tel:108";
+}
+
+function requestAmbulance(){
+    alert("Ambulance request sent (Demo Mode)");
+}
+
+function goBack(){
+    window.location.href = "patient-dashboard.html";
+}
+
+</script>
+
+</body>
+</html>
